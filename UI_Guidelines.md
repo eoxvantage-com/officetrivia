@@ -1,4 +1,4 @@
-# Taruvi UI Guideliness
+# Taruvi UI Guidelines
 
 This document captures what the **Taruvi design system** specifies that the MUI theme alone cannot enforce — page-level patterns, ambiguous color choices, and conventions you need to follow by hand.
 
