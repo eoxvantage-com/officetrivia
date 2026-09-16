@@ -1,20 +1,42 @@
 import { Client } from "@taruvi/sdk";
 
-// Validate required environment variables
-const requiredEnvVars = {
-  TARUVI_SITE_URL: __TARUVI_SITE_URL__,
-  TARUVI_API_KEY: __TARUVI_API_KEY__,
-  TARUVI_APP_SLUG: __TARUVI_APP_SLUG__,
-};
+/**
+ * Taruvi configuration, injected at build time by Vite `define` from the
+ * TARUVI_* variables (see vite.config.ts). Vite reads them from the process
+ * environment as well as from `.env` / `.env.local`, so a `.env` file is
+ * optional — the app boots either way and only warns when values are missing.
+ */
+const configuredSiteUrl = __TARUVI_SITE_URL__;
+const configuredApiKey = __TARUVI_API_KEY__;
+const configuredAppSlug = __TARUVI_APP_SLUG__;
 
-Object.entries(requiredEnvVars).forEach(([key, value]) => {
-  if (!value) {
-    throw new Error(
-      `Missing required environment variable: ${key}. ` +
-        `Please check your .env.local file. See .env.example for required variables.`
-    );
-  }
-});
+const missingConfig = Object.entries({
+  TARUVI_SITE_URL: configuredSiteUrl,
+  TARUVI_API_KEY: configuredApiKey,
+  TARUVI_APP_SLUG: configuredAppSlug,
+})
+  .filter(([, value]) => !value)
+  .map(([key]) => key);
+
+/** True when every TARUVI_* variable was provided at build time. */
+export const isTaruviConfigured = missingConfig.length === 0;
+
+if (!isTaruviConfigured) {
+  console.warn(
+    `[taruvi] Missing configuration: ${missingConfig.join(", ")}. ` +
+      "Set them as TARUVI_* environment variables (or in a .env file — see .env.example). " +
+      "Taruvi API requests will fail until they are provided."
+  );
+}
+
+// Fallbacks so the SDK client can be constructed without configuration:
+// - site URL defaults to the page origin, which is correct when the app is
+//   served from the Taruvi site as a frontend worker;
+// - the SDK rejects an empty API key, so a clearly-invalid placeholder is used.
+const siteUrl =
+  configuredSiteUrl ||
+  (typeof window !== "undefined" ? window.location.origin : "");
+const apiKey = configuredApiKey || "unconfigured";
 
 /**
  * Taruvi Client instance configured with environment variables.
@@ -33,18 +55,8 @@ Object.entries(requiredEnvVars).forEach(([key, value]) => {
  *
  * @see {@link https://docs.taruvi.com|Taruvi Documentation}
  */
-export const taruviClient = (() => {
-  try {
-    return new Client({
-      apiKey: __TARUVI_API_KEY__,
-      appSlug: __TARUVI_APP_SLUG__,
-      apiUrl: __TARUVI_SITE_URL__,
-    });
-  } catch (error) {
-    console.error("Failed to initialize Taruvi Client:", error);
-    throw new Error(
-      "Taruvi configuration error. Please check your .env.local file. " +
-        "See .env.example for required variables."
-    );
-  }
-})();
+export const taruviClient = new Client({
+  apiKey,
+  appSlug: configuredAppSlug,
+  apiUrl: siteUrl,
+});
